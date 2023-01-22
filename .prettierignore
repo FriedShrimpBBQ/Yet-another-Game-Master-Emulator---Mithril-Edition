@@ -1,0 +1,10 @@
+# Ignore artifacts:
+build
+coverage
+*.css
+*.js
+*.less
+*.json
+*.yaml
+*.scss
+*.yml

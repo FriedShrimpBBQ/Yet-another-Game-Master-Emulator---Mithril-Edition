@@ -1,0 +1,7 @@
+*.pdf
+skeleton.html
+*.go
+*.wasm
+wasm_exec.js
+*.svg
+*.json

@@ -1,0 +1,791 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <!--Import bulma.css-->
+    <link
+      type="text/css"
+      rel="stylesheet"
+      href="css/bulma.min.css"
+      media="screen,projection"
+    />
+    <link href="assets/fontawesome/css/fontawesome.css" rel="stylesheet" />
+    <link href="assets/fontawesome/css/brands.css" rel="stylesheet" />
+    <link href="assets/fontawesome/css/solid.css" rel="stylesheet" />
+
+    <link
+      href="assets/openmoji-awesome/css/openmoji-color-awesome.css"
+      rel="stylesheet"
+    />
+    <link
+      href="assets/openmoji-awesome/css/openmoji-black-awesome.css"
+      rel="stylesheet"
+    />
+
+    <!--Import wasm_exec.js based on go env GOROOT-->
+    <script src="js/wasm_exec.js"></script>
+    <script>
+      const go = new Go();
+      WebAssembly.instantiateStreaming(
+        fetch("main.wasm"),
+        go.importObject
+      ).then((result) => {
+        go.run(result.instance);
+      });
+    </script>
+    <!--Let browser know website is optimized for mobile-->
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+
+    <!--Load alpine.js-->
+  </head>
+
+  <body>
+    <div class="container">
+      <div class="section">
+        <h1 class="title">Yet Another Game Master Emulator</h1>
+        <p class="subtitle">
+          For gaining inspiration or solo-play. Based on One Page RPG.
+        </p>
+
+        <div id="rootTop"></div>
+        <div id="rootQuestions"></div>
+      </div>
+    </div>
+    <script src="js/mithril.js"></script>
+    <script>
+      var rootTop = document.querySelector("#rootTop");
+      var rootQuestions = document.querySelector("#rootQuestions");
+      var randomNumberPlaceholder = function (maxInt = 10) {
+        return Math.floor(Math.random() * maxInt) + 1;
+      };
+      var setDifficulty = 5; //randomNumberPlaceholder();
+      var situationQuestionActiveIndex = 0;
+
+      var DifficultyCard = function () {
+        approxNormalDifficulty = Math.floor(
+          (randomNumberPlaceholder() +
+            randomNumberPlaceholder() +
+            randomNumberPlaceholder() +
+            randomNumberPlaceholder() +
+            randomNumberPlaceholder()) /
+            5
+        );
+        return m("div", { class: "card" }, [
+          m(
+            "div",
+            { class: "card-footer-item" },
+            m("i", { class: "oma oma-5x oma-performing-arts" })
+          ),
+          m(
+            "div",
+            { class: "card-footer" },
+            m(
+              "div",
+              { class: "card-footer-item" },
+              "Difficulty: " + approxNormalDifficulty
+            )
+          ),
+        ]);
+      };
+
+      var LikelyOdds = function () {
+        bad = Math.min(randomNumberPlaceholder(6), randomNumberPlaceholder(6));
+        even = randomNumberPlaceholder(6);
+        good = Math.max(randomNumberPlaceholder(6), randomNumberPlaceholder(6));
+
+        badText = bad <= 3 ? "No" : "Yes";
+        evenText = even <= 3 ? "No" : "Yes";
+        goodText = good <= 3 ? "No" : "Yes";
+
+        badText += bad == 1 || bad == 6 ? "!" : "";
+        evenText += even == 1 || even == 6 ? "!" : "";
+        goodText += good == 1 || good == 6 ? "!" : "";
+
+        return m(
+          "div",
+          { class: "block" },
+          m("table", { class: "table is-striped is-bordered is-fullwidth" }, [
+            m(
+              "tr",
+              m(
+                "th",
+                { colspan: "2", style: "text-align: center" },
+                "Likely Odds"
+              )
+            ),
+            m("tr", [m("td", "Bad"), m("td", badText)]),
+            m("tr", [m("td", "Even"), m("td", evenText)]),
+            m("tr", [m("td", "Good"), m("td", goodText)]),
+          ])
+        );
+      };
+
+      var RollDie = function (maxInt = 6, omaIcon = "oma-game-die") {
+        return m(
+          "div",
+          { class: "block card" },
+          m("div", [
+            m(
+              "div",
+              { class: "card-footer" },
+              m(
+                "div",
+                { class: "card-footer-item" },
+                m("i", { class: "oma oma-2x " + omaIcon })
+              )
+            ),
+            m(
+              "div",
+              { class: "card-footer" },
+              m(
+                "div",
+                { class: "card-footer-item" },
+                randomNumberPlaceholder(maxInt)
+              )
+            ),
+          ])
+        );
+      };
+	  
+	  var RollCard = function() {
+	    cardIndex = randomNumberPlaceholder(13)-1
+		omaIcon = randomNumberPlaceholder(4)-1
+		cards = ["A", "2", "3", "4", "5", "6", "7", "8", "9", "10", "J", "Q", "K"]
+		suits = ["oma-club-suit", "oma-diamond-suit", "oma-heart-suit", "oma-spade-suit"]
+
+        return m(
+          "div",
+          { class: "block card" },
+          m("div", [
+            m(
+              "div",
+              { class: "card-footer" },
+              m(
+                "div",
+                { class: "card-footer-item" },
+                m("i", { class: "oma oma-2x " + "oma-joker" })
+              )
+            ),
+            m(
+              "div",
+              { class: "card-footer" },
+              m(
+                "div",
+                { class: "card-footer-item" },
+                [cards[cardIndex], m("i", { class: "oma oma-lg " + suits[omaIcon] })]
+              )
+            ),
+          ])
+        );
+	  }
+
+      var MultiRollDice = function () {
+        return m("div", { class: "columns" }, [
+          m("div", { class: "column is-6" }, [
+            RollDie(2, "oma-coin"),
+            RollDie(),
+          ]),
+          m("div", { class: "column is-6" }, [
+           RollCard(),
+            RollDie(),
+          ]),
+        ]);
+      };
+
+      var OracleHow = function () {
+        baseIcons = [
+          "oma-black-candy",
+          "oma-black-lollipop",
+          "oma-black-cookie",
+          "oma-black-doughnut",
+          "oma-black-shortcake",
+          "oma-black-birthday-cake",
+        ];
+        baseText = [
+          "Surprisingly Lacking",
+          "Less than expected",
+          "About average",
+          "About average",
+          "More than expected",
+          "Extraordinary",
+        ];
+
+        numIndex = randomNumberPlaceholder(6) - 1;
+
+        baseIcons[numIndex] = baseIcons[numIndex].replace(/-black/g, "");
+
+        return m(
+          "div",
+          { class: "block card" },
+          m("div", [
+            m(
+              "div",
+              { class: "card-footer" },
+              m(
+                "div",
+                { class: "card-footer-item" },
+                baseIcons.map((omaIcon) =>
+                  m("i", { class: "oma oma-2x " + omaIcon })
+                )
+              )
+            ),
+            m(
+              "div",
+              { class: "card-footer" },
+              m("div", { class: "card-footer-item" }, baseText[numIndex])
+            ),
+          ])
+        );
+      };
+
+      var OracleElemental = function () {
+        baseIcons = [
+          "oma-black-fire",
+          "oma-black-sweat-droplets",
+          "oma-black-high-voltage",
+          "oma-black-snow-capped-mountain",
+        ];
+        baseText = [
+          "Fire - Social, Personal, Connection",
+          "Water - Mystical, Meaning, Capability",
+          "Lightning - Technical, Mental, Operation",
+          "Earth - Physical, Appearance, Existence",
+        ];
+
+        numIndex = randomNumberPlaceholder(4) - 1;
+
+        baseIcons[numIndex] = baseIcons[numIndex].replace(/-black/g, "");
+
+        return m(
+          "div",
+          { class: "block card" },
+          m("div", [
+            m(
+              "div",
+              { class: "card-footer" },
+              m(
+                "div",
+                { class: "card-footer-item" },
+                baseIcons.map((omaIcon) =>
+                  m("i", { class: "oma oma-2x " + omaIcon })
+                )
+              )
+            ),
+            m(
+              "div",
+              { class: "card-footer" },
+              m("div", { class: "card-footer-item" }, baseText[numIndex])
+            ),
+          ])
+        );
+      };
+
+      var RerollButton = function () {
+        return m(
+          "button",
+          {
+            onclick: function () {
+              setDifficulty = randomNumberPlaceholder();
+            },
+            class: "button",
+          },
+          "Reroll"
+        );
+      };
+
+      var RandomEventBase = function () {
+        baseActionIcon = [
+          "oma-magnifying-glass-tilted-right",
+          "oma-crossed-swords",
+          "oma-comment",
+          "oma-running-shoe",
+          "oma-drop-of-blood",
+          "oma-light-bulb",
+          "oma-confetti-ball",
+          "oma-loudspeaker",
+          "oma-pirate-flag",
+          "oma-shield",
+          "oma-handshake",
+          "oma-rabbit",
+          "oma-ninja",
+        ];
+
+        baseActionText = [
+          "Seek",
+          "Oppose",
+          "Communicate",
+          "Move",
+          "Harm",
+          "Create",
+          "Reveal",
+          "Command",
+          "Take",
+          "Protect",
+          "Assist",
+          "Transform",
+          "Deceive",
+        ];
+
+        baseTopicIcon = [
+          "oma-placard",
+          "oma-people-holding-hands",
+          "oma-houses",
+          "oma-classical-building",
+          "oma-crystal-ball",
+          "oma-troll",
+          "oma-mage",
+          "oma-speaking-head",
+          "oma-signpost",
+          "oma-wrapped-gift",
+          "oma-toolbox",
+          "oma-hut",
+          "oma-index-pointing-at-the-viewer",
+        ];
+        baseTopicText = [
+          "Current Need",
+          "Allies",
+          "Community",
+          "History",
+          "Future Plans",
+          "Enemies",
+          "Knowledge",
+          "Rumors",
+          "A Plot Arc",
+          "Recent Events",
+          "Equipment",
+          "A Faction",
+          "The PCs ",
+        ];
+
+        numActionIndex = randomNumberPlaceholder(13) - 1;
+        actionIcon = baseActionIcon[numActionIndex];
+        actionText = baseActionText[numActionIndex];
+        numTopicIndex = randomNumberPlaceholder(13) - 1;
+        topicIcon = baseTopicIcon[numTopicIndex];
+        topicText = baseTopicText[numTopicIndex];
+
+        return m(
+          "div",
+          { class: "block card" },
+          m("div", [
+            m("div", { class: "card-footer" }, [
+              m(
+                "div",
+                { class: "card-footer-item" },
+                m("i", { class: "oma oma-2x " + actionIcon })
+              ),
+              m(
+                "div",
+                { class: "card-footer-item" },
+                m("i", { class: "oma oma-2x " + topicIcon })
+              ),
+            ]),
+            m("div", { class: "card-footer" }, [
+              m("div", { class: "card-footer-item" }, actionText),
+              m("div", { class: "card-footer-item" }, topicText),
+            ]),
+          ])
+        );
+      };
+      var RandomEvent = function () {
+        isHide = situationQuestionActiveIndex != 0;
+
+        if (isHide) {
+          return "";
+        } else {
+          return m("div", { class: "box columns" }, [
+            m("div", { class: "column is-8" }, RandomEventBase()),
+            m("div", { class: "column is-4" }, OracleElemental()),
+          ]);
+        }
+      };
+
+      var SetTheSceneBase = function () {
+        baseSceneIcon = [
+          "oma-angry-face-with-horns",
+          "oma-construction",
+          "oma-black-cat",
+          "oma-supervillain",
+          "oma-genie",
+        ];
+
+        baseSceneText = [
+          "Hostile forces approach you",
+          "An obstacle blocks your way",
+          "Wouldn't it suck if...",
+          "All is not what it seems",
+          "Things actually go as planned",
+        ];
+
+        baseAlterPositiveIcon = [
+          "oma-sparkles",
+          "oma-collision",
+          "oma-national-park",
+          "oma-bust-in-silhouette",
+        ];
+        baseAlterPositiveText = [
+          "A major detail of the scene is enhanced",
+          "A major detail of the scene is somehow worse",
+          "The environment is different",
+          "Unexpected NPCs are present",
+        ];
+
+        baseAlterNegativeIcon = [
+          "oma-sparkles",
+          "oma-collision",
+          "oma-national-park",
+          "oma-bust-in-silhouette",
+        ];
+        baseAlterNegativeText = [
+          "A major detail of the scene is enhanced",
+          "A major detail of the scene is somehow worse",
+          "The environment is different",
+          "Unexpected NPCs are present",
+        ];
+
+        numSceneIndex = randomNumberPlaceholder(5) - 1;
+        sceneIcon = baseSceneIcon[numSceneIndex];
+        sceneText = baseSceneText[numSceneIndex];
+        alterIndex = -1;
+        alterIcon = "";
+        alterText = "";
+
+        if (numSceneIndex == 4) {
+          alterIndex = randomNumberPlaceholder(4) - 1;
+          alterIcon = baseAlterPositiveIcon[alterIndex];
+          alterText = baseAlterPositiveText[alterIndex];
+        }
+        if (numSceneIndex == 3) {
+          alterIndex = randomNumberPlaceholder(4) - 1;
+          alterIcon = baseAlterNegativeIcon[alterIndex];
+          alterText = baseAlterNegativeText[alterIndex];
+        }
+
+        if (alterIndex < 0) {
+          return m(
+            "div",
+            { class: "block card" },
+            m("div", [
+              m("div", { class: "card-footer" }, [
+                m(
+                  "div",
+                  { class: "card-footer-item" },
+                  m("i", { class: "oma oma-2x " + sceneIcon })
+                ),
+              ]),
+              m("div", { class: "card-footer" }, [
+                m("div", { class: "card-footer-item" }, sceneText),
+              ]),
+            ])
+          );
+        } else {
+          return m(
+            "div",
+            { class: "block card" },
+            m("div", [
+              m("div", { class: "card-footer" }, [
+                m(
+                  "div",
+                  { class: "card-footer-item" },
+                  m("i", { class: "oma oma-2x " + sceneIcon })
+                ),
+                m(
+                  "div",
+                  { class: "card-footer-item" },
+                  m("i", { class: "oma oma-2x " + alterIcon })
+                ),
+              ]),
+              m("div", { class: "card-footer" }, [
+                m("div", { class: "card-footer-item" }, sceneText),
+                m("div", { class: "card-footer-item" }, alterText),
+              ]),
+            ])
+          );
+        }
+      };
+
+      var SetTheScene = function () {
+        isHide = situationQuestionActiveIndex != 1;
+
+        if (isHide) {
+          return "";
+        } else {
+          return m("div", { class: "box columns" }, [
+            m("div", { class: "column is-8" }, SetTheSceneBase()),
+            m("div", { class: "column is-4" }, OracleElemental()),
+            ,
+          ]);
+        }
+      };
+
+      var ComplexQuestionBase = function () {
+        baseSceneIcon = [
+          "oma-mouse",
+          "oma-elephant",
+          "oma-older-person",
+          "oma-baby",
+          "oma-farmer",
+          "oma-ice",
+          "oma-dna",
+          "oma-face-comiting",
+          "oma-scientist",
+          "oma-party-popper",
+          "oma-deser-island",
+          "oma-crown",
+          "oma-four-leaf-clover",
+        ];
+
+        baseSceneText = [
+          "Small",
+          "Large",
+          "Old",
+          "New",
+          "Mundane",
+          "Simple",
+          "Complex",
+          "Unsavory",
+          "Specialized",
+          "Unexpected",
+          "Exotic",
+          "Dignified",
+          "Unique",
+        ];
+
+        numSceneIndex = randomNumberPlaceholder(baseSceneIcon.length) - 1;
+        sceneIcon = baseSceneIcon[numSceneIndex];
+        sceneText = baseSceneText[numSceneIndex];
+
+        return m(
+          "div",
+          { class: "block card" },
+          m("div", [
+            m("div", { class: "card-footer" }, [
+              m(
+                "div",
+                { class: "card-footer-item" },
+                m("i", { class: "oma oma-2x " + sceneIcon })
+              ),
+            ]),
+            m("div", { class: "card-footer" }, [
+              m("div", { class: "card-footer-item" }, sceneText),
+            ]),
+          ])
+        );
+      };
+
+      var ComplexQuestion = function () {
+        isHide = situationQuestionActiveIndex != 2;
+
+        if (isHide) {
+          return "";
+        } else {
+          return m("div", { class: "box columns" }, [
+            m("div", { class: "column is-8" }, ComplexQuestionBase()),
+            m("div", { class: "column is-4" }, OracleElemental()),
+            ,
+          ]);
+        }
+      };
+
+      var PacingMovesBase = function () {
+        baseSceneIcon = [
+          "oma-zombie",
+          "oma-microscope",
+          "oma-merperson",
+          "oma-biohazrd",
+          "oma-puzzle-piece",
+        ];
+
+        baseSceneText = [
+          "Foreshadow Trouble",
+          "Reveal a New Detail",
+          "An NPC Takes Action",
+          "Advance a Threat",
+          "Advance a Plot",
+        ];
+
+        numSceneIndex = randomNumberPlaceholder(baseSceneIcon.length) - 1;
+        sceneIcon = baseSceneIcon[numSceneIndex];
+        sceneText = baseSceneText[numSceneIndex];
+
+        return m(
+          "div",
+          { class: "block card" },
+          m("div", [
+            m("div", { class: "card-footer" }, [
+              m(
+                "div",
+                { class: "card-footer-item" },
+                m("i", { class: "oma oma-2x " + sceneIcon })
+              ),
+            ]),
+            m("div", { class: "card-footer" }, [
+              m("div", { class: "card-footer-item" }, sceneText),
+            ]),
+          ])
+        );
+      };
+
+      var PacingMoves = function () {
+        isHide = situationQuestionActiveIndex != 3;
+
+        if (isHide) {
+          return "";
+        } else {
+          return m("div", { class: "box columns" }, [
+            m("div", { class: "column is-8" }, PacingMovesBase()),
+            m("div", { class: "column is-4" }, OracleElemental()),
+            ,
+          ]);
+        }
+      };
+
+      var FailureMovesBase = function () {
+        baseSceneIcon = [
+          "oma-drop-of-blood",
+          "oma-movie-camera",
+          "oma-red-question-mark",
+          "oma-biohazrd",
+          "oma-exclaimation-question-mark",
+          "oma-zombie",
+        ];
+
+        baseSceneText = [
+          "Cause Harm",
+          "Put Someone in a Spot",
+          "Offer a Choice",
+          "Advance a Threat",
+          "Reveal an Unwelcome Truth",
+          "Foreshadow Trouble",
+        ];
+
+        numSceneIndex = randomNumberPlaceholder(baseSceneIcon.length) - 1;
+        sceneIcon = baseSceneIcon[numSceneIndex];
+        sceneText = baseSceneText[numSceneIndex];
+
+        return m(
+          "div",
+          { class: "block card" },
+          m("div", [
+            m("div", { class: "card-footer" }, [
+              m(
+                "div",
+                { class: "card-footer-item" },
+                m("i", { class: "oma oma-2x " + sceneIcon })
+              ),
+            ]),
+            m("div", { class: "card-footer" }, [
+              m("div", { class: "card-footer-item" }, sceneText),
+            ]),
+          ])
+        );
+      };
+
+      var FailureMoves = function () {
+        isHide = situationQuestionActiveIndex != 4;
+
+        if (isHide) {
+          return "";
+        } else {
+          return m("div", { class: "box columns" }, [
+            m("div", { class: "column is-8" }, FailureMovesBase()),
+            m("div", { class: "column is-4" }, OracleElemental()),
+            ,
+          ]);
+        }
+      };
+
+      var SituationalQuestions = function () {
+        // situationQuestionActiveIndex
+        var baseSituationQuestions = [
+          m(
+            "li",
+            {
+              class: situationQuestionActiveIndex == 0 ? "is-active" : "",
+              onclick: function () {
+                situationQuestionActiveIndex = 0;
+              },
+            },
+            m("a", "Random Event")
+          ),
+          m(
+            "li",
+            {
+              class: situationQuestionActiveIndex == 1 ? "is-active" : "",
+              onclick: function () {
+                situationQuestionActiveIndex = 1;
+              },
+            },
+            m("a", "Set The Scene")
+          ),
+          m(
+            "li",
+            {
+              class: situationQuestionActiveIndex == 2 ? "is-active" : "",
+              onclick: function () {
+                situationQuestionActiveIndex = 2;
+              },
+            },
+            m("a", "Complex Question")
+          ),
+          m(
+            "li",
+            {
+              class: situationQuestionActiveIndex == 3 ? "is-active" : "",
+              onclick: function () {
+                situationQuestionActiveIndex = 3;
+              },
+            },
+            m("a", "Game Master Pacing Move")
+          ),
+          m(
+            "li",
+            {
+              class: situationQuestionActiveIndex == 4 ? "is-active" : "",
+              onclick: function () {
+                situationQuestionActiveIndex = 4;
+              },
+            },
+            m("a", "Game Master Failure Move")
+          ),
+        ];
+
+        // use this to also hide the ones which need to be shown...
+
+        return m(
+          "div",
+          { class: "tabs is-centered" },
+          m("ul", baseSituationQuestions)
+        );
+      };
+
+      var LayoutTop = function () {
+        return {
+          view: function () {
+            return m("div", [
+              m("div", { class: "box block columns" }, [
+                m("div", { class: "column is-2" }, DifficultyCard()),
+                m("div", { class: "column is-2" }, LikelyOdds()),
+                m("div", { class: "column is-4" }, MultiRollDice()),
+                m("div", { class: "column is-4" }, [
+                  OracleHow(),
+                  OracleElemental(),
+                ]),
+              ]),
+              m("div", { class: "box block" }, [
+                SituationalQuestions(),
+                RandomEvent(),
+                SetTheScene(),
+                ComplexQuestion(),
+                PacingMoves(),
+                FailureMoves(),
+              ]),
+            ]);
+          },
+        };
+      };
+
+      m.mount(rootTop, LayoutTop());
+    </script>
+    <!--JavaScript at end of body for optimized loading-->
+  </body>
+</html>
